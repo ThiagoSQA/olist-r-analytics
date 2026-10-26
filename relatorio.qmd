@@ -1,0 +1,118 @@
+---
+title: "Brazilian E-Commerce | Sales & Customer Insights"
+subtitle: "Análise de vendas, logística e experiência do cliente usando R"
+author: "Thiago Andrade"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    embed-resources: true
+    anchor-sections: true
+    page-layout: article
+output-file: index.html
+execute:
+  echo: false
+  warning: false
+  message: false
+lang: pt-BR
+---
+
+```{r}
+#| label: preparacao
+library(readr)
+library(knitr)
+kpis <- read_csv("outputs/tables/kpis.csv", show_col_types = FALSE)
+mensal <- read_csv("outputs/tables/mensal.csv", show_col_types = FALSE)
+estados <- read_csv("outputs/tables/estados.csv", show_col_types = FALSE)
+satisfacao <- read_csv("outputs/tables/satisfacao_entrega.csv", show_col_types = FALSE)
+recompra <- read_csv("outputs/tables/recompra.csv", show_col_types = FALSE)
+qualidade <- read_csv("outputs/tables/qualidade.csv", show_col_types = FALSE)
+fmt <- function(x, casas = 0) {
+  formatC(x, format = "f", digits = casas, big.mark = ".", decimal.mark = ",")
+}
+```
+
+## Contexto de negocio
+
+Este estudo investiga o desempenho de pedidos de e-commerce no Brasil, com enfoque em **vendas de produtos, distribuicao geografica, cumprimento de prazos e satisfacao**. A fonte e a base publica Olist, com observacoes historicas de 2016 a 2018. O escopo da analise inclui **pedidos entregues que possuem itens cadastrados**.
+
+## Indicadores principais
+
+- **Pedidos analisados:** `r fmt(kpis$total_pedidos_entregues[1])`
+- **GMV de produtos (sem frete):** R$ `r fmt(kpis$gmv_produtos[1], 2)`
+- **Ticket medio por pedido:** R$ `r fmt(kpis$ticket_medio[1], 2)`
+- **Entregas no prazo (com data conhecida):** `r fmt(100 * kpis$pct_no_prazo[1], 1)`%
+- **Nota media dos pedidos avaliados:** `r fmt(kpis$nota_media[1], 2)` / 5
+- **Clientes com dois ou mais pedidos entregues:** `r fmt(100 * kpis$taxa_recorrencia[1], 1)`%
+
+> **Cuidado de metrica:** "GMV" aqui e a soma de `price` dos itens, sem frete. Não é receita líquida nem comissão da plataforma. A taxa de recorrencia representa apenas as compras observadas no período da amostra.
+
+## Evolucao comercial
+
+```{r}
+#| fig-cap: "GMV mensal dos pedidos entregues, agrupado pela data de compra."
+knitr::include_graphics("outputs/figures/01_gmv_mensal.png")
+```
+
+A interpretacao deve considerar que o periodo de observacao e historico, possui janelas possivelmente incompletas e nao permite inferir crescimento posterior a 2018.
+
+## Desempenho geografico
+
+```{r}
+#| fig-cap: "Estados dos clientes com maior GMV de produtos."
+knitr::include_graphics("outputs/figures/02_gmv_estados.png")
+```
+
+O campo geografico corresponde ao **estado do cliente**, nao a localizacao do vendedor ou da entrega em rota.
+
+## Entrega e satisfacao
+
+```{r}
+#| fig-cap: "Avaliacao média dos pedidos com entrega no prazo vs. atrasada."
+knitr::include_graphics("outputs/figures/03_avaliacao_entregas.png")
+```
+
+```{r}
+#| label: tabela-satisfacao
+satisfacao$nota_media <- round(satisfacao$nota_media, 2)
+satisfacao$pct_notas_baixas <- paste0(fmt(satisfacao$pct_notas_baixas * 100, 1), "%")
+names(satisfacao) <- c("Situacão", "Pedidos avaliados", "Nota média", "Notas 1-2")
+knitr::kable(satisfacao, caption = "Indicadores de satisfacão por status de entrega")
+```
+
+A diferenca entre os grupos e uma **associacao descritiva**, nao uma prova de que o atraso causou a nota. Outros fatores nao observados podem influenciar a satisfacao.
+
+## Recorrencia de compra
+
+A base inclui **`r fmt(recompra$clientes_unicos[1])` clientes unicos com pedido entregue**; destes, **`r fmt(recompra$clientes_recorrentes[1])`** aparecem com dois ou mais pedidos entregues. Esta medida nao e uma taxa de retencao por coorte, pois os clientes tiveram diferentes periodos de observacao.
+
+## Qualidade dos dados
+
+```{r}
+#| label: tabela-qualidade
+knitr::kable(
+  data.frame(Metrica = c("Pedidos entregues na fonte", "Sem itens", "Pedidos modelados",
+                          "Sem data de compra", "Sem informação de prazo",
+                          "Sem avaliação", "Valor de produtos não positivo"),
+             Quantidade = unlist(qualidade[1, ])),
+  caption = "Controle de qualidade e critérios de exclusão"
+)
+```
+
+## Recomendacoes a investigar
+
+1. **Operacao:** identificar regioes e periodos com maior percentual de entregas atrasadas antes de redesenhar processos logisticos.
+2. **Experiencia do cliente:** priorizar diagnosticos de pedidos atrasados com notas baixas; investigar causas adicionais antes de inferir causalidade.
+3. **Comercial:** analisar segmentos com maior valor de pedidos e comparar o potencial de recompra por coortes de aquisicao, como extensao futura.
+
+Essas sao **hipoteses e linhas de acao para investigacao**, nao conclusoes confirmadas sobre fatores causais.
+
+## Fonte, metodologia e limitacoes
+
+Fonte: [Brazilian E-Commerce Public Dataset by Olist (Kaggle)](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce).
+
+Os scripts agregam itens por pedido antes da integracao, selecionam uma avaliacao por pedido e preservam uma linha por pedido. Atraso e definido pela **data de entrega posterior ao dia estimado**; entregas com datas ausentes nao entram no denominador da pontualidade. O recorte abrange apenas pedidos entregues com itens, e os resultados nao representam pedidos cancelados, faturamento liquido nem a situacao atual do comercio eletronico brasileiro.
+
+Codigo e reproducao: consulte o arquivo `README.md` no repositorio deste projeto.
